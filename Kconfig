@@ -1,7 +1,7 @@
-config RTL8812AU
-	tristate "Realtek 8812A USB WiFi"
+config RTL88XXAU
+	tristate "Realtek 88XXau USB WiFi"
 	depends on USB
 	select WIRELESS_EXT
 	help
-	  Help message of RTL8812AU
+	  Help message of RTL88XXAU
 

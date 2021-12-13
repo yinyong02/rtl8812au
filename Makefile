@@ -1,31 +1,24 @@
-EXTRA_CFLAGS += $(USER_EXTRA_CFLAGS)
-EXTRA_CFLAGS += -O1
-#EXTRA_CFLAGS += -O3
-#EXTRA_CFLAGS += -Wall
-#EXTRA_CFLAGS += -Wextra
-#EXTRA_CFLAGS += -Werror
-#EXTRA_CFLAGS += -pedantic
-#EXTRA_CFLAGS += -Wshadow -Wpointer-arith -Wcast-qual -Wstrict-prototypes -Wmissing-prototypes
-
+EXTRA_CFLAGS += $(USER_EXTRA_CFLAGS) -fno-pie
+EXTRA_CFLAGS += -O3
 EXTRA_CFLAGS += -Wno-unused-variable
 #EXTRA_CFLAGS += -Wno-unused-value
-#EXTRA_CFLAGS += -Wno-unused-label
+EXTRA_CFLAGS += -Wno-unused-label
 #EXTRA_CFLAGS += -Wno-unused-parameter
-#EXTRA_CFLAGS += -Wno-unused-function
-EXTRA_CFLAGS += -Wno-unused
-#EXTRA_CFLAGS += -Wno-uninitialized
-EXTRA_CFLAGS += -Wno-vla
+EXTRA_CFLAGS += -Wno-unused-function
+EXTRA_CFLAGS += -Wno-implicit-fallthrough
+#EXTRA_CFLAGS += -Wno-parentheses-equality
+#EXTRA_CFLAGS += -Wno-pointer-bool-conversion
+EXTRA_CFLAGS += -Wno-unknown-pragmas
+#EXTRA_CFLAGS += -Wno-unused
+EXTRA_CFLAGS += -Wno-vla -g
 
-GCC_VER_49 := $(shell echo `$(CC) -dumpversion | cut -f1-2 -d.` \>= 4.9 | bc )
-ifeq ($(GCC_VER_49),1)
-EXTRA_CFLAGS += -Wno-date-time	# Fix compile error && warning on gcc 4.9 and later
-endif
+#GCC_VER_49 := $(shell echo `$(CC) -dumpversion | cut -f1-2 -d.` \>= 4.9 | bc )
+#ifeq ($(GCC_VER_49),1)
+#EXTRA_CFLAGS += -Wno-date-time	# Fix compile error && warning on gcc 4.9 and later
+#endif
 
 EXTRA_CFLAGS += -I$(src)/include
-
-EXTRA_LDFLAGS += --strip-debug
-
-CONFIG_AUTOCFG_CP = n
+EXTRA_LDFLAGS += --strip-all -O3
 
 ########################## WIFI IC ############################
 CONFIG_MULTIDRV = n
@@ -105,7 +98,7 @@ EXTRA_CFLAGS += -DCONFIG_RTW_ANDROID=$(CONFIG_RTW_ANDROID)
 endif
 
 ########################## Debug ###########################
-CONFIG_RTW_DEBUG = y
+CONFIG_RTW_DEBUG = n
 # default log level is _DRV_INFO_ = 4,
 # please refer to "How_to_set_driver_debug_log_level.doc" to set the available level.
 CONFIG_RTW_LOG_LEVEL = 0
@@ -210,7 +203,13 @@ CONFIG_CUSTOMER_HUAWEI_GENERAL = n
 
 CONFIG_DRVEXT_MODULE = n
 
-export TopDIR ?= $(shell pwd)
+ifeq ($(CONFIG_RTL8812AU), )
+ifneq (,$(findstring /usr/lib/dkms,$(PATH)))
+    export TopDIR ?= $(shell pwd)
+else
+export TopDIR ?= $(srctree)/$(src)
+endif
+endif
 
 ########### COMMON  #################################
 ifeq ($(CONFIG_GSPI_HCI), y)
@@ -227,6 +226,15 @@ endif
 
 ifeq ($(CONFIG_PCI_HCI), y)
 HCI_NAME = pci
+endif
+
+ifeq ($(CONFIG_RTL8812A)_$(CONFIG_RTL8821A)_$(CONFIG_RTL8814A), y_n_n)
+EXTRA_CFLAGS += -DDRV_NAME=\"rtl88XXau\"
+ifeq ($(CONFIG_USB_HCI), y)
+USER_MODULE_NAME = 88XXau
+endif
+else
+EXTRA_CFLAGS += -DDRV_NAME=\"rtl8812au\"
 endif
 
 
@@ -571,7 +579,7 @@ endif
 ifeq ($(CONFIG_RTL8814A), y)
 ## ADD NEW VHT MP HW TX MODE ##
 #EXTRA_CFLAGS += -DCONFIG_MP_VHT_HW_TX_MODE
-#CONFIG_MP_VHT_HW_TX_MODE = y
+CONFIG_MP_VHT_HW_TX_MODE = n
 ##########################################
 RTL871X = rtl8814a
 ifeq ($(CONFIG_USB_HCI), y)
@@ -1355,7 +1363,7 @@ EXTRA_CFLAGS += -DCONFIG_CONCURRENT_MODE
 endif
 EXTRA_CFLAGS += -DCONFIG_LITTLE_ENDIAN
 EXTRA_CFLAGS += -DCONFIG_IOCTL_CFG80211 -DRTW_USE_CFG80211_STA_EVENT
-SUBARCH := $(shell uname -m | sed -e s/i.86/i386/)
+SUBARCH := $(shell uname -m | sed -e "s/i.86/i386/; s/ppc/powerpc/; s/armv.l/arm/; s/aarch64/arm64/;")
 ARCH ?= $(SUBARCH)
 CROSS_COMPILE ?=
 KVER  := $(shell uname -r)
@@ -1443,7 +1451,6 @@ KVER:= 3.4.0
 KSRC := $(KERNEL_BUILD_PATH)
 MODULE_NAME :=wlan
 endif
-
 
 ifeq ($(CONFIG_PLATFORM_ACTIONS_ATM705X), y)
 EXTRA_CFLAGS += -DCONFIG_LITTLE_ENDIAN
@@ -2495,17 +2502,20 @@ ifeq ($(CONFIG_RTL8723B), y)
 $(MODULE_NAME)-$(CONFIG_MP_INCLUDED)+= core/rtw_bt_mp.o
 endif
 
-obj-$(CONFIG_RTL8812AU) := $(MODULE_NAME).o
+obj-$(CONFIG_88XXAU) := $(MODULE_NAME).o
 
 else
 
-export CONFIG_RTL8812AU = m
+export CONFIG_88XXAU = m
 
 all: modules
 
 modules:
 	$(MAKE) ARCH=$(ARCH) CROSS_COMPILE=$(CROSS_COMPILE) -C $(KSRC) M=$(shell pwd)  modules
-
+	@echo "---------------------------------------------------------------------------"
+	@echo "Visit https://github.com/aircrack-ng/rtl8812au for support/reporting issues"
+	@echo "or check for newer versions (branches) of these drivers.                   "
+	@echo "---------------------------------------------------------------------------"
 strip:
 	$(CROSS_COMPILE)strip $(MODULE_NAME).ko --strip-unneeded
 
@@ -2555,6 +2565,19 @@ config_r:
 	@echo "make config"
 	/bin/bash script/Configure script/config.in
 
+DRIVER_VERSION = $(shell grep "\#define DRIVERVERSION" include/rtw_version.h | awk '{print $$3}' | tr -d v\")
+
+dkms_install:
+	mkdir -p /usr/src/8812au-$(DRIVER_VERSION)
+	cp -r * /usr/src/8812au-$(DRIVER_VERSION)
+	dkms add -m 8812au -v $(DRIVER_VERSION)
+	dkms build -m 8812au -v $(DRIVER_VERSION)
+	dkms install -m 8812au -v $(DRIVER_VERSION)
+	dkms status
+
+dkms_remove:
+	dkms remove 8812au/$(DRIVER_VERSION) --all
+	rm -rf /usr/src/8812au-$(DRIVER_VERSION)
 
 .PHONY: modules clean
 
@@ -2566,7 +2589,7 @@ clean:
 	cd hal ; rm -fr *.mod.c *.mod *.o .*.cmd *.ko
 	cd core ; rm -fr */*.mod.c */*.mod */*.o */.*.cmd */*.ko
 	cd core ; rm -fr *.mod.c *.mod *.o .*.cmd *.ko
-	cd os_dep/linux ; rm -fr *.mod.c *.mod *.o .*.cmd *.ko
+	cd os_dep/linux ; rm -fr *.mod.c *.mod *.o .*.cmd *.ko *.o.d
 	cd os_dep ; rm -fr *.mod.c *.mod *.o .*.cmd *.ko
 	cd platform ; rm -fr *.mod.c *.mod *.o .*.cmd *.ko
 	rm -fr Module.symvers ; rm -fr Module.markers ; rm -fr modules.order
